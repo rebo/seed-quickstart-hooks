@@ -1,40 +1,49 @@
-use seed::{*, prelude::*};
+#![feature(track_caller)]
 
+use comp_state::{topo, use_state};
+use seed::{prelude::*, *};
 
-struct Model {
-    pub val: i32,
-}
+#[derive(Default)]
+struct Model {}
 
-impl Default for Model {
-    fn default() -> Self {
-        Self {
-            val: 0,
-        }
-    }
-}
-
-
-#[derive(Clone)]
 enum Msg {
-    Increment,
+    DoNothing,
 }
 
-fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
+fn update(msg: Msg, _model: &mut Model, _: &mut impl Orders<Msg>) {
     match msg {
-        Msg::Increment => model.val += 1,
+        Msg::DoNothing => {}
     }
 }
 
+fn view(_model: &Model) -> impl View<Msg> {
+    root_view()
+}
 
-fn view(model: &Model) -> impl View<Msg> {
-    button![
-        simple_ev(Ev::Click, Msg::Increment),
-        format!("Hello, World × {}", model.val)
+#[topo::nested]
+fn root_view() -> Node<Msg> {
+    div![
+        my_button(),
+        my_button(),
+        my_button(),
+        my_button(),
+        my_button(),
     ]
+}
+
+#[topo::nested]
+fn my_button() -> Node<Msg> {
+    let (count, count_access) = use_state(|| 0);
+    div![button![
+        format!("Clicked {} times", count),
+        mouse_ev(Ev::Click, move |_| {
+            count_access.set(count + 1);
+            Msg::DoNothing
+        })
+    ]]
 }
 
 #[wasm_bindgen(start)]
 pub fn render() {
-    App::builder(update, view)
-        .build_and_start();
+    App::builder(update, view).build_and_start();
 }
