@@ -7,12 +7,12 @@ use seed::{prelude::*, *};
 struct Model {}
 
 enum Msg {
-    DoNothing,
+    NoOp,
 }
 
 fn update(msg: Msg, _model: &mut Model, _: &mut impl Orders<Msg>) {
     match msg {
-        Msg::DoNothing => {}
+        Msg::NoOp => (),
     }
 }
 
@@ -38,7 +38,7 @@ fn my_button() -> Node<Msg> {
         format!("Clicked {} times", count),
         mouse_ev(Ev::Click, move |_| {
             count_access.set(count + 1);
-            Msg::DoNothing
+            Msg::NoOp
         })
     ]]
 }
