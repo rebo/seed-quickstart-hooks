@@ -1,0 +1,19 @@
+[package]
+version = "0.0.10"
+name = "comp_state"
+authors = ["rebo <rebotfc@gmail.com>"]
+repository = "https://github.com/rebo/comp_state"
+description = "Component State - a clone of React Hooks use_state"
+categories = ["react", "component", "use_state"]
+license = "MIT/Apache-2.0"
+readme = "./README.md"
+homepage = "https://github.com/rebo/comp_state"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+topo = "=0.9.4"
+slotmap = "0.4.0"
+anymap = "0.12.1"
+enclose = "1.1.8"
