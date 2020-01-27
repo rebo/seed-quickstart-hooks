@@ -69,9 +69,7 @@ struct NonCloneI32(i32);
 
 #[topo::nested]
 fn my_button_non_clone() -> Node<Msg> {
-    let (count_string, count_access) = with_state(NonCloneI32::default, |non_clone_struct| {
-        non_clone_struct.0.to_string()
-    });
+    let (count_string, count_access) = with_state(NonCloneI32::default, |item| item.0.to_string());
 
     div![
         button![
