@@ -43,6 +43,20 @@ pub fn use_state<T: 'static + Clone, F: FnOnce() -> T>(data_fn: F) -> (T, StateA
     }
 }
 
+pub fn with_state<T: 'static, F: FnOnce() -> T, C: Fn(&mut T) -> R, R>(
+    data_fn: F,
+    with_fn: C,
+) -> (R, StateAccess<T>) {
+    let current_id = topo::Id::current();
+
+    if let Some(mut item) = remove_state_with_topo_id::<T>(current_id) {
+        (with_fn(&mut item), store_state(item))
+    } else {
+        let mut item = data_fn();
+        (with_fn(&mut item), store_state(item))
+    }
+}
+
 ///
 /// use_istate() - create a new internal state.
 ///
@@ -82,19 +96,38 @@ pub fn use_istate<T: 'static + Clone, F: FnOnce() -> T>(data_fn: F) -> (T, State
     }
 }
 
+pub fn use_removed_state<T: 'static, F: FnOnce() -> T>(data_fn: F) -> (T, StateAccess<T>) {
+    let current_id = topo::Id::current();
+
+    // returns a clone of the curent stored type. If the type has not been stored before
+    // set it with the closure passed to use_state.
+    if let Some(stored_data) = remove_state_with_topo_id::<T>(current_id) {
+        (stored_data, StateAccess::new(current_id))
+    } else {
+        let data = data_fn();
+        set_state_with_topo_id::<T>(data, current_id);
+        (
+            remove_state_with_topo_id::<T>(current_id).unwrap(),
+            StateAccess::new(current_id),
+        )
+    }
+}
+
 /// sets the state of type T keyed to the local context.
-pub fn set_state<T: 'static + Clone>(data: T) {
+pub fn store_state<T: 'static>(data: T) -> StateAccess<T> {
     let current_id = topo::Id::current();
 
     STORE.with(|store_refcell| {
         store_refcell
             .borrow_mut()
             .set_state_with_topo_id::<T>(data, current_id)
-    })
+    });
+
+    StateAccess::new(current_id)
 }
 
 /// Sets the state of type T keyed to the given TopoId
-pub fn set_state_with_topo_id<T: 'static + Clone>(data: T, current_id: topo::Id) {
+pub fn set_state_with_topo_id<T: 'static>(data: T, current_id: topo::Id) {
     STORE.with(|store_refcell| {
         store_refcell
             .borrow_mut()
@@ -103,12 +136,20 @@ pub fn set_state_with_topo_id<T: 'static + Clone>(data: T, current_id: topo::Id)
 }
 
 /// Clones the state of type T keyed to the given TopoId
-pub fn get_state_with_topo_id<T: 'static + Clone>(id: topo::Id) -> Option<T> {
+pub fn clone_state_with_topo_id<T: 'static + Clone>(id: topo::Id) -> Option<T> {
     STORE.with(|store_refcell| {
         store_refcell
             .borrow_mut()
             .get_state_with_topo_id::<T>(id)
             .cloned()
+    })
+}
+
+pub fn remove_state_with_topo_id<T: 'static>(id: topo::Id) -> Option<T> {
+    STORE.with(|store_refcell| {
+        store_refcell
+            .borrow_mut()
+            .remove_state_with_topo_id::<T>(id)
     })
 }
 
@@ -121,14 +162,11 @@ pub fn get_state_with_topo_id<T: 'static + Clone>(id: topo::Id) -> Option<T> {
 ///     v.push("foo".to_string()
 /// )
 ///
-pub fn update_state_with_topo_id<T: Clone + 'static, F: FnOnce(&mut T) -> ()>(
-    id: topo::Id,
-    func: F,
-) {
-    let item = &mut get_state_with_topo_id::<T>(id)
+pub fn update_state_with_topo_id<T: 'static, F: FnOnce(&mut T) -> ()>(id: topo::Id, func: F) {
+    let mut item = remove_state_with_topo_id::<T>(id)
         .expect("You are trying to update a type state that doesnt exist in this context!");
-    func(item);
-    set_state_with_topo_id(item.clone(), id);
+    func(&mut item);
+    set_state_with_topo_id(item, id);
 }
 
 /// Clones the state of a type keyed to the current topological context

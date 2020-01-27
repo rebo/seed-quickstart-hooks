@@ -3,15 +3,25 @@ use std::marker::PhantomData;
 
 ///  Accessor struct that provides access to getting and setting the
 ///  state of the stored type
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct StateAccess<T> {
     pub id: topo::Id,
     _phantom_data: PhantomData<T>,
 }
 
+impl<T> Copy for StateAccess<T> {}
+impl<T> Clone for StateAccess<T> {
+    fn clone(&self) -> StateAccess<T> {
+        StateAccess::<T> {
+            id: self.id,
+            _phantom_data: PhantomData::<T>,
+        }
+    }
+}
+
 impl<T> StateAccess<T>
 where
-    T: 'static + Clone,
+    T: 'static,
 {
     pub fn new(id: topo::Id) -> StateAccess<T> {
         StateAccess {
@@ -21,25 +31,39 @@ where
     }
 
     // stores a value of type T in a backing Store
-    pub fn set(&self, value: T) {
+    pub fn set(self, value: T) {
         set_state_with_topo_id(value, self.id);
+    }
+
+    pub fn remove(self) -> Option<T> {
+        remove_state_with_topo_id(self.id)
     }
 
     /// updates the stored state in place
     /// using the provided function
-    pub fn update<F: FnOnce(&mut T) -> ()>(&self, func: F) {
-        let item = &mut self.get().unwrap();
-        func(item);
-        self.set(item.clone());
+    pub fn update<F: FnOnce(&mut T) -> ()>(self, func: F) {
+        update_state_with_topo_id(self.id, func);
     }
+}
 
-    /// returns a option clone of the stored state.
-    pub fn get(&self) -> Option<T> {
-        get_state_with_topo_id::<T>(self.id)
+trait CloneForStateAccess<T>
+where
+    T: Clone + 'static,
+{
+    fn clone_state(&self) -> Option<T>;
+    fn hard_clone(&self) -> T;
+}
+
+impl<T> CloneForStateAccess<T> for StateAccess<T>
+where
+    T: Clone + 'static,
+{
+    fn clone_state(&self) -> Option<T> {
+        clone_state_with_topo_id::<T>(self.id)
     }
 
     /// returns a clone of the stored state panics if not stored.
-    pub fn hard_get(&self) -> T {
-        get_state_with_topo_id::<T>(self.id).unwrap()
+    fn hard_clone(&self) -> T {
+        clone_state_with_topo_id::<T>(self.id).unwrap()
     }
 }

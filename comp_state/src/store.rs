@@ -44,6 +44,28 @@ impl Store {
         }
     }
 
+    pub(crate) fn remove_state_with_topo_id<T: 'static>(
+        &mut self,
+        current_id: topo::Id,
+    ) -> Option<T> {
+        // /self.unseen_ids.remove(&current_id);
+
+        //unwrap or default to keep borrow checker happy
+        let key = self
+            .id_to_key_map
+            .get(&current_id)
+            .copied()
+            .unwrap_or_default();
+
+        if key.is_null() {
+            None
+        } else if let Some(existing_secondary_map) = self.get_mut_secondarymap::<T>() {
+            existing_secondary_map.remove(key)
+        } else {
+            None
+        }
+    }
+
     // pub(crate) fn remove_topo_id(&mut self, id: topo::Id) {
     //     let key = self.id_to_key_map.get(&id).copied().unwrap_or_default();
     //     if !key.is_null() {
