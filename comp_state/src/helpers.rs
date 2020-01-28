@@ -8,13 +8,11 @@ use crate::state_functions::use_state;
 /// do_once(||{
 ///     println!("This will print only once");
 /// });
+#[topo::nested]
 pub fn do_once<F: Fn() -> ()>(func: F) {
-    topo::call(|| {
-        let has_done = use_state(|| false);
-        if !has_done.get() {
-            func();
-            has_done.set(true);
-        }
-        58
-    });
+    let has_done = use_state(|| false);
+    if !has_done.get() {
+        func();
+        has_done.set(true);
+    }
 }
