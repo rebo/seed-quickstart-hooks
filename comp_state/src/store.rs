@@ -22,11 +22,6 @@ impl Store {
             unseen_ids: HashSet::new(),
         }
     }
-    pub(crate) fn get_state<T: 'static>(&mut self) -> Option<&T> {
-        let current_id = topo::Id::current();
-
-        self.get_state_with_topo_id(current_id)
-    }
 
     pub(crate) fn get_state_with_topo_id<T: 'static>(
         &mut self,

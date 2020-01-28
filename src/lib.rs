@@ -1,6 +1,6 @@
 #![feature(track_caller)]
 
-use comp_state::{topo, use_state, with_state};
+use comp_state::{topo, use_state, CloneState};
 use seed::{prelude::*, *};
 
 #[derive(Default)]
@@ -44,22 +44,22 @@ fn root_view() -> Node<Msg> {
 
 #[topo::nested]
 fn my_button() -> Node<Msg> {
-    let (count, count_access) = use_state(|| 3);
+    let count = use_state(|| 3);
     div![
         button![
+            "-",
             mouse_ev(Ev::Click, move |_| {
-                count_access.update(|v| *v -= 1);
+                count.update(|v| *v -= 1);
                 Msg::NoOp
             }),
-            "-"
         ],
-        count.to_string(),
+        count.get().to_string(),
         button![
+            "+",
             mouse_ev(Ev::Click, move |_| {
-                count_access.update(|v| *v += 1);
+                count.update(|v| *v += 1);
                 Msg::NoOp
             }),
-            "+"
         ],
     ]
 }
@@ -69,21 +69,21 @@ struct NonCloneI32(i32);
 
 #[topo::nested]
 fn my_button_non_clone() -> Node<Msg> {
-    let (count_string, count_access) = with_state(NonCloneI32::default, |item| item.0.to_string());
+    let count = use_state(NonCloneI32::default);
 
     div![
         button![
-            "+",
+            "-",
             mouse_ev(Ev::Click, move |_| {
-                count_access.update(|count| count.0 -= 1);
+                count.update(|item| item.0 -= 1);
                 Msg::NoOp
             }),
         ],
-        count_string,
+        count.get_with(|item| item.0.to_string()),
         button![
             "+",
             mouse_ev(Ev::Click, move |_| {
-                count_access.update(|count| count.0 += 1);
+                count.update(|item| item.0 += 1);
                 Msg::NoOp
             }),
         ]
