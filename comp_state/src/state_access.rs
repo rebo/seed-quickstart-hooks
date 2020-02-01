@@ -10,6 +10,12 @@ pub struct StateAccess<T> {
     _phantom_data: PhantomData<T>,
 }
 
+impl<T> std::fmt::Display for StateAccess<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({:#?})", self.id)
+    }
+}
+
 impl<T> Copy for StateAccess<T> {}
 impl<T> Clone for StateAccess<T> {
     fn clone(&self) -> StateAccess<T> {

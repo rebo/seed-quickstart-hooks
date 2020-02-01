@@ -1,13 +1,22 @@
 #![feature(track_caller)]
 
-use comp_state::{topo, use_state, CloneState};
+use comp_state::{topo, use_istate, use_state, CloneState};
 use seed::{prelude::*, *};
+use seed_bind::*;
+
+mod seed_bind;
 
 #[derive(Default)]
 struct Model {}
 
 enum Msg {
     NoOp,
+}
+
+impl Default for Msg {
+    fn default() -> Msg {
+        Msg::NoOp
+    }
 }
 
 fn update(msg: Msg, _model: &mut Model, _: &mut impl Orders<Msg>) {
@@ -39,6 +48,7 @@ fn root_view() -> Node<Msg> {
             my_button_non_clone(),
             my_button_non_clone(),
         ],
+        numberbind(),
     ]
 }
 
@@ -87,6 +97,18 @@ fn my_button_non_clone() -> Node<Msg> {
                 Msg::NoOp
             }),
         ]
+    ]
+}
+
+#[topo::nested]
+fn numberbind() -> Node<Msg> {
+    let a = use_istate(|| 0);
+    let b = use_istate(|| 0);
+
+    div![
+        input![attrs![At::Type=>"number"], bind(At::Value, a)],
+        input![attrs![At::Type=>"number"], bind(At::Value, b)],
+        p![format!("{} + {} = {}", a.get(), b.get(), a.get() + b.get())]
     ]
 }
 
