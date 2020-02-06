@@ -1,6 +1,6 @@
 #![feature(track_caller)]
 
-use comp_state::{topo, use_state};
+use comp_state::{topo, use_state, CloneState};
 use seed::{prelude::*, *};
 
 #[derive(Default)]
@@ -33,11 +33,11 @@ fn root_view() -> Node<Msg> {
 
 #[topo::nested]
 fn my_button() -> Node<Msg> {
-    let (count, count_access) = use_state(|| 0);
+    let count_access = use_state(|| 0);
     div![button![
-        format!("Clicked {} times", count),
+        format!("Clicked {} times", count_access.get()),
         mouse_ev(Ev::Click, move |_| {
-            count_access.set(count + 1);
+            count_access.update(|count| *count += 1);
             Msg::NoOp
         })
     ]]
