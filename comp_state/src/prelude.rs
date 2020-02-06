@@ -32,5 +32,5 @@ pub use crate::helpers::do_once;
 pub use crate::state_access::{CloneState, StateAccess};
 pub use crate::state_functions::{
     clone_state_with_topo_id, purge_and_reset_unseen_ids, set_state_with_topo_id,
-    update_state_with_topo_id, use_istate, use_state,
+    update_state_with_topo_id, use_istate, use_lstate, use_state,
 };

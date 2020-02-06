@@ -1,6 +1,6 @@
 #![feature(track_caller)]
 
-use comp_state::{topo, use_istate, use_state, CloneState};
+use comp_state::{topo, use_istate, use_lstate, use_state, CloneState, StateAccess};
 use seed::{prelude::*, *};
 use seed_bind::*;
 
@@ -49,6 +49,8 @@ fn root_view() -> Node<Msg> {
             my_button_non_clone(),
         ],
         numberbind(),
+        dispatch_test(),
+        todos(),
     ]
 }
 
@@ -100,6 +102,44 @@ fn my_button_non_clone() -> Node<Msg> {
     ]
 }
 
+//
+// Effective clone of Reacts useReducer.
+// Locally adjust state depending on a Message.
+//
+enum ComponentMsg {
+    Increment,
+    Decrement,
+}
+
+fn dispatch(state: StateAccess<i32>, msg: ComponentMsg) {
+    match msg {
+        ComponentMsg::Increment => state.update(|v| *v += 1),
+        ComponentMsg::Decrement => state.update(|v| *v -= 1),
+    }
+}
+
+#[topo::nested]
+fn dispatch_test() -> Node<Msg> {
+    let val = use_state(|| 0);
+    div![
+        button![
+            "-",
+            mouse_ev(Ev::Click, move |_| {
+                dispatch(val, { ComponentMsg::Decrement });
+                Msg::NoOp
+            })
+        ],
+        format!("{}", val.get()),
+        button![
+            "+",
+            mouse_ev(Ev::Click, move |_| {
+                dispatch(val, { ComponentMsg::Increment });
+                Msg::NoOp
+            })
+        ]
+    ]
+}
+
 #[topo::nested]
 fn numberbind() -> Node<Msg> {
     let a = use_istate(|| 0);
@@ -116,3 +156,23 @@ fn numberbind() -> Node<Msg> {
 pub fn render() {
     App::builder(update, view).build_and_start();
 }
+
+#[rustfmt::skip]
+#[topo::nested]
+fn todos() -> Node<Msg> {
+    let todos = use_state(|| vec![use_istate(String::new)]);  
+    div![
+        todos.get().iter().enumerate().map(|(idx, todo)| {
+            vec![
+                input![bind(At::Value, *todo)],
+                button![ "X", mouse_ev(Ev::Click, move |_| 
+                    { todos.update(|t| {t.remove(idx);}); Msg::NoOp }) ],
+                br![],]
+        }),
+        button![
+            mouse_ev(Ev::Click, move |_| {
+                todos.update(|t| t.push(use_lstate(String::new))); Msg::NoOp }),
+            "Add"]
+    ]
+}
+//

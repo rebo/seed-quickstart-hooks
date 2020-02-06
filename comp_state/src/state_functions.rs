@@ -1,3 +1,4 @@
+use crate::state_access::CloneState;
 use crate::state_access::StateAccess;
 use crate::store::Store;
 use std::cell::RefCell;
@@ -48,6 +49,12 @@ pub fn use_state<T: 'static, F: FnOnce() -> T>(data_fn: F) -> StateAccess<T> {
 #[topo::nested]
 pub fn use_istate<T: 'static + Clone, F: FnOnce() -> T>(data_fn: F) -> StateAccess<T> {
     use_state(data_fn)
+}
+#[topo::nested]
+pub fn use_lstate<T: 'static + Clone, F: FnOnce() -> T>(data_fn: F) -> StateAccess<T> {
+    let count = use_state(|| 0);
+    count.update(|c| *c += 1);
+    topo::call_in_slot(count.get(), || use_state(data_fn))
 }
 
 /// Sets the state of type T keyed to the given TopoId
