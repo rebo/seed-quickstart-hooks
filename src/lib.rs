@@ -1,10 +1,9 @@
 #![feature(track_caller)]
 
-use comp_state::{topo, use_state, CloneState};
+use comp_state::{topo, use_istate, use_lstate, use_state, CloneState, StateAccess};
 use seed::{prelude::*, *};
 
-mod ev_handlers_for_state_access;
-use ev_handlers_for_state_access::StateAccessEventHandlers;
+use comp_state_seed_extras::*;
 
 #[derive(Default)]
 struct Model {}
@@ -32,27 +31,143 @@ fn view(_model: &Model) -> impl View<Msg> {
 #[topo::nested]
 fn root_view() -> Node<Msg> {
     div![
-        my_button(),
-        my_button(),
-        my_button(),
-        my_button(),
-        my_button(),
-        my_ev_button(),
+        "Clone Example:",
+        div![my_button(), my_button(),],
+        "None Clone:",
+        div![my_button_non_clone(), my_button_non_clone(),],
+        "Simplified:",
+        div![my_ev_button2(), my_ev_button2(),],
+        "Bind number to inputs:",
+        numberbind(),
+        "Use a function to dispatch",
+        dispatch_test(),
+        "React useEffect Clone",
+        after_example(),
+        "simplified state accessor event handlers:",
         my_ev_input(),
+        my_ev_button(),
+        todos(),
     ]
 }
 
 #[topo::nested]
 fn my_button() -> Node<Msg> {
-    let count_access = use_state(|| 0);
-    div![button![
-        format!("Clicked {} times", count_access.get()),
-        mouse_ev(Ev::Click, move |_| {
-            count_access.update(|count| *count += 1);
-            Msg::NoOp
-        })
-    ]]
+    let count = use_state(|| 3);
+
+    div![
+        button![
+            "-",
+            mouse_ev(Ev::Click, move |_| {
+                count.update(|v| *v -= 1);
+                Msg::NoOp
+            }),
+        ],
+        count.get().to_string(),
+        button![
+            "+",
+            mouse_ev(Ev::Click, move |_| {
+                count.update(|v| *v += 1);
+                Msg::NoOp
+            }),
+        ],
+    ]
 }
+
+#[topo::nested]
+fn my_ev_button2() -> Node<Msg> {
+    let count = use_state(|| 3);
+
+    div![
+        button!["-", count.mouse_ev(Ev::Click, |count, _| *count -= 1)],
+        count.get().to_string(),
+        button!["+", count.mouse_ev(Ev::Click, |count, _| *count += 1)],
+    ]
+}
+
+#[derive(Default)]
+struct NonCloneI32(i32);
+
+#[topo::nested]
+fn my_button_non_clone() -> Node<Msg> {
+    let count = use_state(NonCloneI32::default);
+
+    div![
+        button![
+            "-",
+            mouse_ev(Ev::Click, move |_| {
+                count.update(|item| item.0 -= 1);
+                Msg::NoOp
+            }),
+        ],
+        count.get_with(|item| item.0.to_string()),
+        button![
+            "+",
+            mouse_ev(Ev::Click, move |_| {
+                count.update(|item| item.0 += 1);
+                Msg::NoOp
+            }),
+        ]
+    ]
+}
+
+#[topo::nested]
+fn numberbind() -> Node<Msg> {
+    let a = use_istate(|| 0);
+    let b = use_istate(|| 0);
+
+    div![
+        input![attrs![At::Type=>"number"], bind(At::Value, a)],
+        input![attrs![At::Type=>"number"], bind(At::Value, b)],
+        p![format!("{} + {} = {}", a.get(), b.get(), a.get() + b.get())]
+    ]
+}
+
+//
+// Effective clone of Reacts useReducer.
+// Locally adjust state depending on a Message.
+//
+enum ComponentMsg {
+    Increment,
+    Decrement,
+}
+
+fn dispatch(state: StateAccess<i32>, msg: ComponentMsg) {
+    match msg {
+        ComponentMsg::Increment => state.update(|v| *v += 1),
+        ComponentMsg::Decrement => state.update(|v| *v -= 1),
+    }
+}
+
+#[topo::nested]
+fn dispatch_test() -> Node<Msg> {
+    let val = use_state(|| 0);
+    div![
+        button![
+            "-",
+            mouse_ev(Ev::Click, move |_| {
+                dispatch(val, { ComponentMsg::Decrement });
+                Msg::NoOp
+            })
+        ],
+        format!("{}", val.get()),
+        button![
+            "+",
+            mouse_ev(Ev::Click, move |_| {
+                dispatch(val, { ComponentMsg::Increment });
+                Msg::NoOp
+            })
+        ]
+    ]
+}
+
+#[wasm_bindgen(start)]
+pub fn render() {
+    App::builder(update, view).build_and_start();
+}
+
+#[rustfmt::skip]
+
+//
 
 #[topo::nested]
 fn my_ev_button() -> Node<Msg> {
@@ -62,6 +177,7 @@ fn my_ev_button() -> Node<Msg> {
         count_access.mouse_ev(Ev::Click, |count, _| *count += 1),
     ]]
 }
+
 fn my_ev_input() -> Node<Msg> {
     let input_access = use_state(|| "".to_string());
 
@@ -74,7 +190,39 @@ fn my_ev_input() -> Node<Msg> {
     ]
 }
 
-#[wasm_bindgen(start)]
-pub fn render() {
-    App::builder(update, view).build_and_start();
+#[topo::nested]
+fn todos() -> Node<Msg> {
+    let todos = use_state(|| vec![use_istate(String::new)]);
+    div![
+        todos.get().iter().enumerate().map(|(idx, todo)| {
+            vec![
+                input![bind(At::Value, *todo)],
+                button![
+                    "X",
+                    todos.mouse_ev(Ev::Click, move |todo, _| {
+                        todo.remove(idx);
+                    })
+                ],
+                br![],
+            ]
+        }),
+        button![
+            mouse_ev(Ev::Click, move |_| {
+                todos.update(|t| t.push(use_lstate(String::new)));
+                Msg::NoOp
+            }),
+            "Add"
+        ]
+    ]
+}
+
+#[topo::nested]
+fn after_example() -> Node<Msg> {
+    after_render(false, || {
+        document().set_title("The Page has been rendered");
+        if let Some(my_div) = get_html_element_by_id("my_div") {
+            my_div.set_inner_text("This div has been rendered");
+        }
+    });
+    div![id!("my_div"), "Not Rendered"]
 }
