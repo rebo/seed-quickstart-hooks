@@ -40,6 +40,8 @@ fn root_view() -> Node<Msg> {
         div![my_button(), my_button(),],
         "None Clone:",
         div![my_button_non_clone(), my_button_non_clone(),],
+        "Simplified:",
+        div![my_ev_button2(), my_ev_button2(),],
         "Bind number to inputs:",
         numberbind(),
         "Use a function to dispatch",
@@ -49,18 +51,8 @@ fn root_view() -> Node<Msg> {
         "simplified state accessor event handlers:",
         my_ev_input(),
         my_ev_button(),
+        todos(),
     ]
-}
-
-#[topo::nested]
-fn after_example() -> Node<Msg> {
-    after_render(false, || {
-        document().set_title("The Page has been rendered");
-        if let Some(my_div) = get_html_element_by_id("my_div") {
-            my_div.set_inner_text("This div has been rendered");
-        }
-    });
-    div![id!("my_div"), "Not Rendered"]
 }
 
 #[topo::nested]
@@ -83,6 +75,17 @@ fn my_button() -> Node<Msg> {
                 Msg::NoOp
             }),
         ],
+    ]
+}
+
+#[topo::nested]
+fn my_ev_button2() -> Node<Msg> {
+    let count = use_state(|| 3);
+
+    div![
+        button!["-", count.mouse_ev(Ev::Click, |count, _| *count -= 1)],
+        count.get().to_string(),
+        button!["+", count.mouse_ev(Ev::Click, |count, _| *count += 1)],
     ]
 }
 
@@ -109,6 +112,18 @@ fn my_button_non_clone() -> Node<Msg> {
                 Msg::NoOp
             }),
         ]
+    ]
+}
+
+#[topo::nested]
+fn numberbind() -> Node<Msg> {
+    let a = use_istate(|| 0);
+    let b = use_istate(|| 0);
+
+    div![
+        input![attrs![At::Type=>"number"], bind(At::Value, a)],
+        input![attrs![At::Type=>"number"], bind(At::Value, b)],
+        p![format!("{} + {} = {}", a.get(), b.get(), a.get() + b.get())]
     ]
 }
 
@@ -147,18 +162,6 @@ fn dispatch_test() -> Node<Msg> {
                 Msg::NoOp
             })
         ]
-    ]
-}
-
-#[topo::nested]
-fn numberbind() -> Node<Msg> {
-    let a = use_istate(|| 0);
-    let b = use_istate(|| 0);
-
-    div![
-        input![attrs![At::Type=>"number"], bind(At::Value, a)],
-        input![attrs![At::Type=>"number"], bind(At::Value, b)],
-        p![format!("{} + {} = {}", a.get(), b.get(), a.get() + b.get())]
     ]
 }
 
@@ -216,4 +219,15 @@ fn todos() -> Node<Msg> {
             "Add"
         ]
     ]
+}
+
+#[topo::nested]
+fn after_example() -> Node<Msg> {
+    after_render(false, || {
+        document().set_title("The Page has been rendered");
+        if let Some(my_div) = get_html_element_by_id("my_div") {
+            my_div.set_inner_text("This div has been rendered");
+        }
+    });
+    div![id!("my_div"), "Not Rendered"]
 }
