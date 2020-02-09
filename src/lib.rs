@@ -1,27 +1,20 @@
 #![feature(track_caller)]
 
 use comp_state::{topo, use_istate, use_lstate, use_state, CloneState, StateAccess};
+use ev_handlers::StateAccessEventHandlers;
 use seed::{prelude::*, *};
 use seed_bind::*;
+use utils::*;
 
+mod ev_handlers;
 mod seed_bind;
-
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use wasm_bindgen::JsCast;
+mod utils;
 
 #[derive(Default)]
 struct Model {}
 
 enum Msg {
     NoOp,
-}
-
-fn request_animation_frame(f: &Closure<dyn FnMut(f64)>) {
-    window()
-        .request_animation_frame(f.as_ref().unchecked_ref())
-        .expect("should register `requestAnimationFrame` OK");
 }
 
 impl Default for Msg {
@@ -44,38 +37,19 @@ fn view(_model: &Model) -> impl View<Msg> {
 fn root_view() -> Node<Msg> {
     div![
         "Clone Example:",
-        div![
-            my_button(),
-            my_button(),
-            my_button(),
-            my_button(),
-            my_button(),
-        ],
+        div![my_button(), my_button(),],
         "None Clone:",
-        div![
-            my_button_non_clone(),
-            my_button_non_clone(),
-            my_button_non_clone(),
-            my_button_non_clone(),
-            my_button_non_clone(),
-        ],
+        div![my_button_non_clone(), my_button_non_clone(),],
+        "Bind number to inputs:",
         numberbind(),
+        "Use a function to dispatch",
         dispatch_test(),
-        todos(),
+        "React useEffect Clone",
         after_example(),
+        "simplified state accessor event handlers:",
+        my_ev_input(),
+        my_ev_button(),
     ]
-}
-
-fn get_html_element_by_id(id: &str) -> Option<web_sys::HtmlElement> {
-    let maybe_elem = document()
-        .get_element_by_id(id)
-        .map(wasm_bindgen::JsCast::dyn_into::<web_sys::HtmlElement>);
-
-    if let Some(Ok(elem)) = maybe_elem {
-        Some(elem)
-    } else {
-        None
-    }
 }
 
 #[topo::nested]
@@ -194,42 +168,52 @@ pub fn render() {
 }
 
 #[rustfmt::skip]
+
+//
+
+#[topo::nested]
+fn my_ev_button() -> Node<Msg> {
+    let count_access = use_state(|| 0);
+    div![button![
+        format!("Clicked {} times", count_access.get()),
+        count_access.mouse_ev(Ev::Click, |count, _| *count += 1),
+    ]]
+}
+
+fn my_ev_input() -> Node<Msg> {
+    let input_access = use_state(|| "".to_string());
+
+    div![
+        input![
+            attrs![ At::Value => input_access.get()],
+            input_access.input_ev(Ev::Input, |input, text| *input = text),
+        ],
+        format!("Text inputted: {}", input_access.get())
+    ]
+}
+
 #[topo::nested]
 fn todos() -> Node<Msg> {
-    let todos = use_state(|| vec![use_istate(String::new)]);  
+    let todos = use_state(|| vec![use_istate(String::new)]);
     div![
         todos.get().iter().enumerate().map(|(idx, todo)| {
             vec![
                 input![bind(At::Value, *todo)],
-                button![ "X", mouse_ev(Ev::Click, move |_| 
-                    { todos.update(|t| {t.remove(idx);}); Msg::NoOp }) ],
-                br![],]
+                button![
+                    "X",
+                    todos.mouse_ev(Ev::Click, move |todo, _| {
+                        todo.remove(idx);
+                    })
+                ],
+                br![],
+            ]
         }),
         button![
             mouse_ev(Ev::Click, move |_| {
-                todos.update(|t| t.push(use_lstate(String::new))); Msg::NoOp }),
-            "Add"]
+                todos.update(|t| t.push(use_lstate(String::new)));
+                Msg::NoOp
+            }),
+            "Add"
+        ]
     ]
-}
-//
-
-#[topo::nested]
-fn after_render<F: Fn() -> () + 'static>(rerun: bool, func: F) {
-    let already_triggered = use_state(|| false);
-    if rerun {
-        already_triggered.set(false);
-    }
-    if already_triggered.get() {
-        return;
-    }
-    already_triggered.set(true);
-    let f = Rc::new(RefCell::new(None));
-    let g = f.clone();
-
-    // let mut i = 0;
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(move |_| {
-        func();
-        f.borrow_mut().take();
-    }) as Box<dyn FnMut(f64)>));
-    request_animation_frame(g.borrow().as_ref().unwrap());
 }
