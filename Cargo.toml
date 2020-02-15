@@ -18,10 +18,17 @@ comp_state_seed_extras = "0.0.2"
 # For serialization, eg sending requests to a server. Otherwise, not required.
 serde = { version = "^1.0.85", features = ['derive'] }
 futures = "^0.1.26"
-web-sys = "0.3.35"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2.50" # NOTE: keep in sync with wasm-bindgen version
+
+
+[dependencies.web-sys]
+version = "0.3.35"
+features = [
+  'HtmlElement',
+  'CssStyleDeclaration',
+]
 
 
 [profile.release]  # Attempts to minimize file size

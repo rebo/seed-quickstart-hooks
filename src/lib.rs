@@ -31,6 +31,8 @@ fn view(_model: &Model) -> impl View<Msg> {
 #[topo::nested]
 fn root_view() -> Node<Msg> {
     div![
+        focus_example(),
+        // other_examples(),
         "Clone Example:",
         div![my_button(), my_button(),],
         "None Clone:",
@@ -42,7 +44,7 @@ fn root_view() -> Node<Msg> {
         "Use a function to dispatch",
         dispatch_test(),
         "React useEffect Clone",
-        after_example(),
+        // after_example(),
         "simplified state accessor event handlers:",
         my_ev_input(),
         my_ev_button(),
@@ -217,12 +219,60 @@ fn todos() -> Node<Msg> {
 }
 
 #[topo::nested]
-fn after_example() -> Node<Msg> {
-    after_render(false, || {
-        document().set_title("The Page has been rendered");
-        if let Some(my_div) = get_html_element_by_id("my_div") {
-            my_div.set_inner_text("This div has been rendered");
+fn focus_example() -> Node<Msg> {
+    let input_string = use_state(String::new);
+
+    after_render(false, move || {
+        if let Some(elem) = get_html_element_by_id(&input_string.identity()) {
+            let _ = elem.focus();
         }
     });
-    div![id!("my_div"), "Not Rendered"]
+
+    input![id!(input_string.identity())]
 }
+
+trait StateAccessAsString {
+    fn identity(self) -> String;
+}
+
+impl<T> StateAccessAsString for StateAccess<T> {
+    fn identity(self) -> String {
+        format!("{}", self)
+    }
+}
+
+// #[topo::nested]
+// fn after_example() -> Node<Msg> {
+//     after_render(false, || {
+//         document().set_title("The Page has been rendered");
+//         if let Some(my_div) = get_html_element_by_id("my_div") {
+//             my_div.set_inner_text("This div has been rendered");
+//         }
+//     });
+//     div![id!("my_div"), "Not Rendered"]
+// }
+
+// #[topo::nested]
+// fn other_examples() -> Node<Msg> {
+//     let recalculate_width = use_state(|| false);
+
+//     after_render(recalculate_width.get(), move || {
+//         if let Some(my_div) = get_html_element_by_id("my_div2") {
+//             if let Ok(Some(style)) = window().get_computed_style(&my_div) {
+//                 my_div.set_inner_text(&format!(
+//                     "width of this div = {}",
+//                     style.get_property_value("width").unwrap()
+//                 ))
+//             }
+//         }
+//         recalculate_width.set(false);
+//     });
+
+//     div![
+//         div![id!("my_div2")],
+//         button![
+//             "Calculate Width of div",
+//             recalculate_width.mouse_ev(Ev::Click, |recalc, _| *recalc = !*recalc)
+//         ],
+//     ]
+// }
