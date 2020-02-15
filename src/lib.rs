@@ -36,6 +36,8 @@ fn view(_model: &Model) -> impl View<Msg> {
 #[topo::nested]
 fn root_view() -> Node<Msg> {
     div![
+        deps_example(),
+        focus_example(),
         "Clone Example:",
         div![my_button(), my_button(),],
         "None Clone:",
@@ -217,4 +219,56 @@ fn todos() -> Node<Msg> {
             "Add"
         ]
     ]
+}
+
+#[topo::nested]
+fn focus_example() -> Node<Msg> {
+    let input_string = use_state(String::new);
+
+    after_render_once(move || {
+        if let Some(elem) = get_html_element_by_id(&input_string.identity()) {
+            let _ = elem.focus();
+        }
+    });
+
+    input![id!(input_string.identity())]
+}
+
+#[topo::nested]
+fn deps_example() -> Node<Msg> {
+    use std::cmp::Ordering;
+    let input_a = use_istate(String::new);
+    let input_b = use_istate(String::new);
+
+    after_render_deps(&[input_a, input_b], move || {
+        if let (Ok(a), Ok(b)) = (input_a.get().parse::<i32>(), input_b.get().parse::<i32>()) {
+            let smallest = match a.cmp(&b) {
+                Ordering::Less => "<li>A is the smallest</li>",
+                Ordering::Greater => "<li>B is the smallest</li>",
+                Ordering::Equal => "<li>Neither is the smallest</li>",
+            };
+
+            if let Some(elem) = get_html_element_by_id("list") {
+                let _ = elem.insert_adjacent_html("beforeend", smallest);
+            }
+        }
+    });
+
+    div![
+        "A:",
+        input![bind(At::Value, input_a)],
+        "B:",
+        input![bind(At::Value, input_b)],
+        ul![id!("list"), "Smallest Log:"],
+    ]
+}
+
+trait StateAccessAsString {
+    fn identity(self) -> String;
+}
+
+impl<T> StateAccessAsString for StateAccess<T> {
+    fn identity(self) -> String {
+        format!("{}", self)
+    }
 }

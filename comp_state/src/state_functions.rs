@@ -8,6 +8,27 @@ thread_local! {
     static STORE: RefCell<Store> = RefCell::new(Store::new());
 }
 
+// thread_local! {
+//     static DESTROY_LIST: RefCell<Vec<Box<dyn StateDestroyTrait>>> = RefCell::new(vec![]);
+// }
+
+// pub trait StateDestroyTrait {
+//     fn destroy(self);
+//     fn add_to_destroy_list(self);
+// }
+
+// impl<T> StateDestroyTrait for StateAccess<T>
+// where
+//     T: 'static,
+// {
+//     fn destroy(self) {
+//         self.remove();
+//     }
+//     fn add_to_destroy_list(self) {
+//         DESTROY_LIST.with(|list| list.borrow_mut().push(Box::new(self)));
+//     }
+// }
+
 ///
 /// Constructs a T accessor. T is stored keyed to the current topological context.
 /// The accessor always references this context therefore can you can set/update/ or get this T
