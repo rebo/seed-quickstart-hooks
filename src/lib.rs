@@ -46,8 +46,6 @@ fn root_view() -> Node<Msg> {
         numberbind(),
         "Use a function to dispatch",
         dispatch_test(),
-        "React useEffect Clone",
-        after_example(),
         "simplified state accessor event handlers:",
         my_ev_input(),
         my_ev_button(),
@@ -219,15 +217,4 @@ fn todos() -> Node<Msg> {
             "Add"
         ]
     ]
-}
-
-#[topo::nested]
-fn after_example() -> Node<Msg> {
-    after_render(false, || {
-        document().set_title("The Page has been rendered");
-        if let Some(my_div) = get_html_element_by_id("my_div") {
-            my_div.set_inner_text("This div has been rendered");
-        }
-    });
-    div![id!("my_div"), "Not Rendered"]
 }
