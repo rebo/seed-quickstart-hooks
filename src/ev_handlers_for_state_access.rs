@@ -10,13 +10,13 @@ where
         &self,
         event: Ev,
         func: F,
-    ) -> seed::Listener<Ms>;
+    ) -> seed::EventHandler<Ms>;
 
     fn mouse_ev<F: Fn(&mut T, web_sys::MouseEvent) -> () + 'static + Clone, Ms: Default + 'static>(
         &self,
         event: Ev,
         func: F,
-    ) -> seed::Listener<Ms>;
+    ) -> seed::EventHandler<Ms>;
 }
 
 impl<T> StateAccessEventHandlers<T> for StateAccess<T>
@@ -27,7 +27,7 @@ where
         &self,
         event: Ev,
         func: F,
-    ) -> seed::Listener<Ms> {
+    ) -> seed::EventHandler<Ms> {
         let accessor = *self;
         input_ev(event, move |text| {
             accessor.update(|val| func(val, text));
@@ -42,7 +42,7 @@ where
         &self,
         event: Ev,
         func: F,
-    ) -> seed::Listener<Ms> {
+    ) -> seed::EventHandler<Ms> {
         let accessor = *self;
         mouse_ev(event, move |m_ev| {
             accessor.update(|val| func(val, m_ev));

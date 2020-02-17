@@ -4,10 +4,11 @@ use std::marker::PhantomData;
 ///  Accessor struct that provides access to getting and setting the
 ///  state of the stored type
 ///
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct StateAccess<T> {
     pub id: topo::Id,
     _phantom_data: PhantomData<T>,
+    pub clean_up: bool,
 }
 
 impl<T> std::fmt::Display for StateAccess<T> {
@@ -22,6 +23,7 @@ impl<T> Clone for StateAccess<T> {
         StateAccess::<T> {
             id: self.id,
             _phantom_data: PhantomData::<T>,
+            clean_up: false,
         }
     }
 }
@@ -34,6 +36,7 @@ where
         StateAccess {
             id,
             _phantom_data: PhantomData,
+            clean_up: false,
         }
     }
 
@@ -81,5 +84,26 @@ where
 
     fn soft_get(&self) -> Option<T> {
         clone_state_with_topo_id::<T>(self.id)
+    }
+}
+
+#[derive(Clone)]
+struct ChangedWrapper<T>(T);
+
+pub trait ChangedState {
+    fn changed(&self) -> bool;
+}
+
+impl<T> ChangedState for StateAccess<T>
+where
+    T: Clone + 'static + PartialEq,
+{
+    fn changed(&self) -> bool {
+        if let Some(old_state) = clone_state_with_topo_id::<ChangedWrapper<T>>(self.id) {
+            old_state.0 != self.get()
+        } else {
+            set_state_with_topo_id(ChangedWrapper(self.get()), self.id);
+            true
+        }
     }
 }

@@ -4,7 +4,7 @@ pub trait UpdateElLocal<T> {
     fn update(self, el: &mut T);
 }
 
-impl<Ms> UpdateElLocal<El<Ms>> for (seed::Attrs, seed::Listener<Ms>) {
+impl<Ms> UpdateElLocal<El<Ms>> for (seed::Attrs, seed::EventHandler<Ms>) {
     fn update(self, el: &mut El<Ms>) {
         self.0.update(el);
         self.1.update(el);
@@ -14,7 +14,7 @@ impl<Ms> UpdateElLocal<El<Ms>> for (seed::Attrs, seed::Listener<Ms>) {
 pub fn bind<Ms: Default, T: 'static + std::str::FromStr + std::fmt::Display>(
     attr: At,
     val: StateAccess<T>,
-) -> (seed::virtual_dom::attrs::Attrs, seed::Listener<Ms>) {
+) -> (seed::virtual_dom::attrs::Attrs, seed::EventHandler<Ms>) {
     let val_disp = val.get_with(|v| format!("{}", v));
 
     (

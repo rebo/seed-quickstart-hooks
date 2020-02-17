@@ -1,6 +1,8 @@
 #![feature(track_caller)]
 
-use comp_state::{topo, use_istate, use_lstate, use_state, CloneState, StateAccess};
+use comp_state::{
+    do_once, topo, use_istate, use_lstate, use_state, ChangedState, CloneState, StateAccess,
+};
 use ev_handlers::StateAccessEventHandlers;
 use seed::{prelude::*, *};
 use seed_bind::*;
@@ -36,7 +38,8 @@ fn view(_model: &Model) -> impl View<Msg> {
 #[topo::nested]
 fn root_view() -> Node<Msg> {
     div![
-        deps_example(),
+        parent_comp_example(),
+        if_example(),
         focus_example(),
         "Clone Example:",
         div![my_button(), my_button(),],
@@ -223,36 +226,38 @@ fn todos() -> Node<Msg> {
 
 #[topo::nested]
 fn focus_example() -> Node<Msg> {
-    let input_string = use_state(String::new);
+    let input = use_state(ElRef::default);
 
-    after_render_once(move || {
-        if let Some(elem) = get_html_element_by_id(&input_string.identity()) {
-            let _ = elem.focus();
-        }
+    do_once(|| {
+        after_render(move |_| {
+            let input_elem: web_sys::HtmlElement = input.get().get().expect("input element");
+            input_elem.focus().expect("focus input");
+        });
     });
-
-    input![id!(input_string.identity())]
+    input![el_ref(&input.get())]
 }
 
 #[topo::nested]
-fn deps_example() -> Node<Msg> {
+fn if_example() -> Node<Msg> {
     use std::cmp::Ordering;
     let input_a = use_istate(String::new);
     let input_b = use_istate(String::new);
 
-    after_render_deps(&[input_a, input_b], move || {
-        if let (Ok(a), Ok(b)) = (input_a.get().parse::<i32>(), input_b.get().parse::<i32>()) {
-            let smallest = match a.cmp(&b) {
-                Ordering::Less => "<li>A is the smallest</li>",
-                Ordering::Greater => "<li>B is the smallest</li>",
-                Ordering::Equal => "<li>Neither is the smallest</li>",
-            };
+    if input_a.changed() || input_b.changed() {
+        after_render(move |_| {
+            if let (Ok(a), Ok(b)) = (input_a.get().parse::<i32>(), input_b.get().parse::<i32>()) {
+                let smallest = match a.cmp(&b) {
+                    Ordering::Less => "<li>A is the smallest</li>",
+                    Ordering::Greater => "<li>B is the smallest</li>",
+                    Ordering::Equal => "<li>Neither is the smallest</li>",
+                };
 
-            if let Some(elem) = get_html_element_by_id("list") {
-                let _ = elem.insert_adjacent_html("beforeend", smallest);
+                if let Some(elem) = get_html_element_by_id("list") {
+                    let _ = elem.insert_adjacent_html("beforeend", smallest);
+                }
             }
-        }
-    });
+        });
+    }
 
     div![
         "A:",
@@ -272,3 +277,191 @@ impl<T> StateAccessAsString for StateAccess<T> {
         format!("{}", self)
     }
 }
+
+use slotmap::{DefaultKey, DenseSlotMap};
+
+#[derive(Clone)]
+struct IdTreeNode {
+    key: DefaultKey,
+    child_keys: Vec<DefaultKey>,
+    id: topo::Id,
+}
+
+#[derive(Clone, Default)]
+struct IdTree {
+    tree: DenseSlotMap<DefaultKey, IdTreeNode>,
+    root_key: Option<DefaultKey>,
+}
+
+impl IdTree {
+    fn root_with(&mut self, id: topo::Id) {
+        let key = self.tree.insert_with_key(|key| IdTreeNode {
+            child_keys: vec![],
+            id,
+            key,
+        });
+        self.root_key = Some(key);
+    }
+    fn destroy_all(&mut self) {
+        for node in self.tree.values() {
+            log!(format!("destroying {:#?}", node.id))
+        }
+    }
+
+    fn get_branch_keys(&self, key: DefaultKey, collected_keys: &mut Vec<DefaultKey>) {
+        let node = self.tree.get(key).unwrap();
+
+        for key in &node.child_keys {
+            collected_keys.push(*key);
+            self.get_branch_keys(*key, collected_keys);
+        }
+    }
+
+    fn destroy_from_id(&mut self, id: topo::Id) {
+        let mut collected_keys = vec![];
+        if let Some(node) = self.tree.values().find(|node| node.id == id) {
+            collected_keys.push(node.key);
+            self.get_branch_keys(node.key, &mut collected_keys);
+        }
+        for key in collected_keys {
+            if let Some(node) = &self.tree.get(key) {
+                log!(format!("Destroying: {:#?}", node.id));
+            }
+        }
+    }
+
+    fn push_child(&mut self, parent_id: topo::Id, child_id: topo::Id) {
+        if self.tree.values().any(|node| node.id == child_id) {
+            return;
+        }
+
+        let child_key = self.tree.insert_with_key(|key| IdTreeNode {
+            key,
+            id: child_id,
+            child_keys: vec![],
+        });
+
+        let parent_key = self
+            .tree
+            .values()
+            .find(|node| node.id == parent_id)
+            .unwrap()
+            .key;
+
+        let parent = self.tree.get_mut(parent_key).unwrap();
+        parent.child_keys.push(child_key);
+    }
+}
+
+fn create_id_tree() -> StateAccess<IdTree> {
+    use_state(|| {
+        let mut id_tree = IdTree::default();
+        id_tree.root_with(topo::Id::current());
+        id_tree
+    })
+}
+
+trait StateAccessIdTree {
+    fn add_current(self, parent_id: topo::Id);
+    fn add_id(self, parent_id: topo::Id, child_id: topo::Id);
+}
+
+impl StateAccessIdTree for StateAccess<IdTree> {
+    fn add_current(self, parent_id: topo::Id) {
+        self.update(|tree| tree.push_child(parent_id, topo::Id::current()));
+    }
+    fn add_id(self, parent_id: topo::Id, child_id: topo::Id) {
+        self.update(|tree| tree.push_child(parent_id, child_id));
+    }
+}
+
+#[topo::nested]
+fn parent_comp_example() -> Node<Msg> {
+    let tree_destroyed = use_istate(|| false);
+
+    let id_tree = create_id_tree();
+
+    div![
+        if !tree_destroyed.get() {
+            child_comp(id_tree, topo::Id::current())
+        } else {
+            empty![]
+        },
+        button![
+            "Destroy",
+            id_tree.mouse_ev(Ev::Click, move |tree, _| {
+                tree.destroy_all();
+                tree_destroyed.set(true);
+            })
+        ]
+    ]
+}
+
+#[topo::nested]
+fn child_comp(id_tree: StateAccess<IdTree>, parent_id: topo::Id) -> Node<Msg> {
+    id_tree.add_current(parent_id);
+    let current_id = topo::Id::current();
+    div![
+        button![
+            "Destroy",
+            id_tree.mouse_ev(Ev::Click, move |tree, _| {
+                tree.destroy_from_id(current_id);
+            })
+        ],
+        format!("{:#?}", topo::Id::current()),
+        child_comp_a(id_tree, topo::Id::current()),
+        child_comp_a(id_tree, topo::Id::current()),
+        child_comp_a(id_tree, topo::Id::current()),
+        child_comp_b(id_tree, topo::Id::current()),
+    ]
+}
+
+#[topo::nested]
+fn child_comp_a(id_tree: StateAccess<IdTree>, parent_id: topo::Id) -> Node<Msg> {
+    id_tree.add_current(parent_id);
+    let current_id = topo::Id::current();
+    div![
+        button![
+            "Destroy",
+            id_tree.mouse_ev(Ev::Click, move |tree, _| {
+                tree.destroy_from_id(current_id);
+            })
+        ],
+        format!("{:#?}", topo::Id::current())
+    ]
+}
+
+#[topo::nested]
+fn child_comp_b(id_tree: StateAccess<IdTree>, parent_id: topo::Id) -> Node<Msg> {
+    id_tree.add_current(parent_id);
+    let current_id = topo::Id::current();
+    div![
+        button![
+            "Destroy",
+            id_tree.mouse_ev(Ev::Click, move |tree, _| {
+                tree.destroy_from_id(current_id);
+            })
+        ],
+        format!("{:#?}", topo::Id::current()),
+        child_comp_c(id_tree, topo::Id::current())
+    ]
+}
+
+#[topo::nested]
+fn child_comp_c(id_tree: StateAccess<IdTree>, parent_id: topo::Id) -> Node<Msg> {
+    id_tree.add_current(parent_id);
+    let current_id = topo::Id::current();
+
+    div![
+        button![
+            "Destroy",
+            id_tree.mouse_ev(Ev::Click, move |tree, _| {
+                tree.destroy_from_id(current_id);
+            })
+        ],
+        format!("{:#?}", topo::Id::current())
+    ]
+}
+
+// #[topo::nested]
+// fn cleanup_example() {}
