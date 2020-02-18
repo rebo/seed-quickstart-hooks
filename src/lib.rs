@@ -1,6 +1,8 @@
 #![feature(track_caller)]
 
-use comp_state::{topo, use_istate, use_lstate, use_state, CloneState, StateAccess};
+use comp_state::{
+    do_once, topo, use_state, use_state_unique, ChangedState, CloneState, StateAccess,
+};
 use seed::{prelude::*, *};
 
 use comp_state_seed_extras::*;
@@ -31,7 +33,7 @@ fn view(_model: &Model) -> impl View<Msg> {
 #[topo::nested]
 fn root_view() -> Node<Msg> {
     div![
-        deps_example(),
+        if_example(),
         focus_example(),
         // other_examples(),
         "Clone Example:",
@@ -115,8 +117,8 @@ fn my_button_non_clone() -> Node<Msg> {
 
 #[topo::nested]
 fn numberbind() -> Node<Msg> {
-    let a = use_istate(|| 0);
-    let b = use_istate(|| 0);
+    let a = use_state(|| 0);
+    let b = use_state(|| 0);
 
     div![
         input![attrs![At::Type=>"number"], bind(At::Value, a)],
@@ -195,7 +197,7 @@ fn my_ev_input() -> Node<Msg> {
 
 #[topo::nested]
 fn todos() -> Node<Msg> {
-    let todos = use_state(|| vec![use_istate(String::new)]);
+    let todos = use_state(|| vec![use_state(String::new)]);
     div![
         todos.get().iter().enumerate().map(|(idx, todo)| {
             vec![
@@ -211,7 +213,7 @@ fn todos() -> Node<Msg> {
         }),
         button![
             mouse_ev(Ev::Click, move |_| {
-                todos.update(|t| t.push(use_lstate(String::new)));
+                todos.update(|t| t.push(use_state_unique(String::new)));
                 Msg::NoOp
             }),
             "Add"
@@ -221,36 +223,38 @@ fn todos() -> Node<Msg> {
 
 #[topo::nested]
 fn focus_example() -> Node<Msg> {
-    let input_string = use_state(String::new);
+    let input = use_state(ElRef::default);
 
-    after_render_once(move || {
-        if let Some(elem) = get_html_element_by_id(&input_string.identity()) {
-            let _ = elem.focus();
-        }
+    do_once(|| {
+        after_render(move |_| {
+            let input_elem: web_sys::HtmlElement = input.get().get().expect("input element");
+            input_elem.focus().expect("focus input");
+        });
     });
-
-    input![id!(input_string.identity())]
+    input![el_ref(&input.get())]
 }
 
 #[topo::nested]
-fn deps_example() -> Node<Msg> {
+fn if_example() -> Node<Msg> {
     use std::cmp::Ordering;
-    let input_a = use_istate(String::new);
-    let input_b = use_istate(String::new);
+    let input_a = use_state(String::new);
+    let input_b = use_state(String::new);
 
-    after_render_deps(&[input_a, input_b], move || {
-        if let (Ok(a), Ok(b)) = (input_a.get().parse::<i32>(), input_b.get().parse::<i32>()) {
-            let smallest = match a.cmp(&b) {
-                Ordering::Less => "<li>A is the smallest</li>",
-                Ordering::Greater => "<li>B is the smallest</li>",
-                Ordering::Equal => "<li>Neither is the smallest</li>",
-            };
+    if input_a.changed() || input_b.changed() {
+        after_render(move |_| {
+            if let (Ok(a), Ok(b)) = (input_a.get().parse::<i32>(), input_b.get().parse::<i32>()) {
+                let smallest = match a.cmp(&b) {
+                    Ordering::Less => "<li>A is the smallest</li>",
+                    Ordering::Greater => "<li>B is the smallest</li>",
+                    Ordering::Equal => "<li>Neither is the smallest</li>",
+                };
 
-            if let Some(elem) = get_html_element_by_id("list") {
-                let _ = elem.insert_adjacent_html("beforeend", smallest);
+                if let Some(elem) = get_html_element_by_id("list") {
+                    let _ = elem.insert_adjacent_html("beforeend", smallest);
+                }
             }
-        }
-    });
+        });
+    }
 
     div![
         "A:",
